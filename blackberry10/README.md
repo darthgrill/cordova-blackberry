@@ -158,3 +158,4 @@ To remove a plugin, on the command line, type the following command:
 To view a list of installed plugins, on the command line, type the following command:
 
         plugman ls
+
