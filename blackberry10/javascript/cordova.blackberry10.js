@@ -1,5 +1,5 @@
 // Platform: blackberry10
-// 3.5.0-dev-ba3190d
+// 3.4.0-dev-286dff2
 /*
  Licensed to the Apache Software Foundation (ASF) under one
  or more contributor license agreements.  See the NOTICE file
@@ -19,8 +19,8 @@
  under the License.
 */
 ;(function() {
-var CORDOVA_JS_BUILD_LABEL = '3.5.0-dev-ba3190d';
-// file: src/scripts/require.js
+var CORDOVA_JS_BUILD_LABEL = '3.4.0-dev-286dff2';
+// file: lib/scripts/require.js
 
 /*jshint -W079 */
 /*jshint -W020 */
@@ -98,7 +98,7 @@ if (typeof module === "object" && typeof require === "function") {
     module.exports.define = define;
 }
 
-// file: src/cordova.js
+// file: lib/cordova.js
 define("cordova", function(require, exports, module) {
 
 
@@ -316,7 +316,7 @@ module.exports = cordova;
 
 });
 
-// file: src/common/argscheck.js
+// file: lib/common/argscheck.js
 define("cordova/argscheck", function(require, exports, module) {
 
 var exec = require('cordova/exec');
@@ -382,7 +382,7 @@ moduleExports.enableChecks = true;
 
 });
 
-// file: src/common/base64.js
+// file: lib/common/base64.js
 define("cordova/base64", function(require, exports, module) {
 
 var base64 = exports;
@@ -438,7 +438,7 @@ function uint8ToBase64(rawData) {
 
 });
 
-// file: src/common/builder.js
+// file: lib/common/builder.js
 define("cordova/builder", function(require, exports, module) {
 
 var utils = require('cordova/utils');
@@ -551,7 +551,7 @@ exports.replaceHookForTesting = function() {};
 
 });
 
-// file: src/common/channel.js
+// file: lib/common/channel.js
 define("cordova/channel", function(require, exports, module) {
 
 var utils = require('cordova/utils'),
@@ -792,7 +792,7 @@ module.exports = channel;
 
 });
 
-// file: src/blackberry10/exec.js
+// file: lib/blackberry10/exec.js
 define("cordova/exec", function(require, exports, module) {
 
 var cordova = require('cordova'),
@@ -816,42 +816,15 @@ function RemoteFunctionCall(functionUri) {
         params[name] = encodeURIComponent(JSON.stringify(value));
     };
 
-    this.makeAsyncCall = function () {
+    this.makeSyncCall = function () {
         var requestUri = composeUri(),
-            request = new XMLHttpRequest(),
-            didSucceed,
-            response,
-            fail = function () {
-                var callbackId = JSON.parse(decodeURIComponent(params.callbackId));
-                response = JSON.parse(decodeURIComponent(request.responseText) || "null");
-                cordova.callbacks[callbackId].fail && cordova.callbacks[callbackId].fail(response.msg, response);
-                delete cordova.callbacks[callbackId];
-            };
-
-        request.open("POST", requestUri, true /* async */);
-        request.setRequestHeader("Content-Type", "application/json");
-        request.timeout = 1000; // Timeout in 1000ms
-        request.ontimeout = fail;
-        request.onerror = fail;
-
-        request.onload = function () {
-            response = JSON.parse(decodeURIComponent(request.responseText) || "null");
-            if (request.status === 200) {
-                didSucceed = response.code === cordova.callbackStatus.OK || response.code === cordova.callbackStatus.NO_RESULT;
-                cordova.callbackFromNative(
-                        JSON.parse(decodeURIComponent(params.callbackId)),
-                        didSucceed,
-                        response.code,
-                        [ didSucceed ? response.data : response.msg ],
-                        !!response.keepCallback
-                        );
-            } else {
-                fail();
-            }
-        };
-
+        request = createXhrRequest(requestUri, false),
+        response;
         request.send(JSON.stringify(params));
+        response = JSON.parse(decodeURIComponent(request.responseText) || "null");
+        return response;
     };
+
 }
 
 module.exports = function (success, fail, service, action, args) {
@@ -859,6 +832,7 @@ module.exports = function (success, fail, service, action, args) {
     request = new RemoteFunctionCall(uri),
     callbackId = service + cordova.callbackId++,
     proxy,
+    response,
     name,
     didSucceed;
 
@@ -882,15 +856,31 @@ module.exports = function (success, fail, service, action, args) {
                 request.addParam(name, args[name]);
             }
         }
+        
+        response = request.makeSyncCall();
 
-        request.makeAsyncCall();
+        if (response.code < 0) {
+            if (fail) {
+                fail(response.msg, response);
+            }
+            delete cordova.callbacks[callbackId];
+        } else {
+            didSucceed = response.code === cordova.callbackStatus.OK || response.code === cordova.callbackStatus.NO_RESULT;
+            cordova.callbackFromNative(
+                callbackId,
+                didSucceed,
+                response.code,
+                [ didSucceed ? response.data : response.msg ],
+                !!response.keepCallback
+            );
+        }
     }
 
 };
 
 });
 
-// file: src/common/exec/proxy.js
+// file: lib/common/exec/proxy.js
 define("cordova/exec/proxy", function(require, exports, module) {
 
 
@@ -920,7 +910,7 @@ module.exports = {
 };
 });
 
-// file: src/common/init.js
+// file: lib/common/init.js
 define("cordova/init", function(require, exports, module) {
 
 var channel = require('cordova/channel');
@@ -1034,7 +1024,7 @@ channel.join(function() {
 
 });
 
-// file: src/common/modulemapper.js
+// file: lib/common/modulemapper.js
 define("cordova/modulemapper", function(require, exports, module) {
 
 var builder = require('cordova/builder'),
@@ -1135,7 +1125,7 @@ exports.reset();
 
 });
 
-// file: src/blackberry10/platform.js
+// file: lib/blackberry10/platform.js
 define("cordova/platform", function(require, exports, module) {
 
 module.exports = {
@@ -1177,11 +1167,10 @@ module.exports = {
 
 });
 
-// file: src/common/pluginloader.js
+// file: lib/common/pluginloader.js
 define("cordova/pluginloader", function(require, exports, module) {
 
 var modulemapper = require('cordova/modulemapper');
-var urlutil = require('cordova/urlutil');
 
 // Helper function to inject a <script> tag.
 function injectScript(url, onload, onerror) {
@@ -1250,14 +1239,11 @@ function handlePluginsObject(path, moduleList, finishPluginLoading) {
 }
 
 function injectPluginScript(pathPrefix, finishPluginLoading) {
-    var pluginPath = pathPrefix + 'cordova_plugins.js';
-
-    injectScript(pluginPath, function() {
+    injectScript(pathPrefix + 'cordova_plugins.js', function(){
         try {
             var moduleList = require("cordova/plugin_list");
             handlePluginsObject(pathPrefix, moduleList, finishPluginLoading);
-        }
-        catch (e) {
+        } catch (e) {
             // Error loading cordova_plugins.js, file not found or something
             // this is an acceptable error, pre-3.0.0, so we just move on.
             finishPluginLoading();
@@ -1294,24 +1280,24 @@ exports.load = function(callback) {
 
 });
 
-// file: src/common/urlutil.js
+// file: lib/common/urlutil.js
 define("cordova/urlutil", function(require, exports, module) {
 
+var urlutil = exports;
+var anchorEl = document.createElement('a');
 
 /**
  * For already absolute URLs, returns what is passed in.
  * For relative URLs, converts them to absolute ones.
  */
-exports.makeAbsolute = function makeAbsolute(url) {
-    var anchorEl = document.createElement('a');
+urlutil.makeAbsolute = function(url) {
     anchorEl.href = url;
     return anchorEl.href;
 };
 
-
 });
 
-// file: src/common/utils.js
+// file: lib/common/utils.js
 define("cordova/utils", function(require, exports, module) {
 
 var utils = exports;
@@ -1482,7 +1468,7 @@ function UUIDcreatePart(length) {
 });
 
 window.cordova = require('cordova');
-// file: src/scripts/bootstrap.js
+// file: lib/scripts/bootstrap.js
 
 require('cordova/init');
 
